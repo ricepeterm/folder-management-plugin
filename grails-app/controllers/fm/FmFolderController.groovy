@@ -932,9 +932,9 @@ class FmFolderController {
     }
 
     def folderDetail() {
-        log.debug "** action: folderDetail called!"
+        log.info "** action: folderDetail called!"
         def folderId = params.id
-        log.debug "PARAMS = $params"
+        log.info "PARAMS = $params"
 
         def folder
         def subFolders
@@ -952,6 +952,7 @@ class FmFolderController {
         if (folderId) {
             folder = FmFolder.get(folderId)
 
+            log.info "FolderId ${folderId} folder ${folder}"
             if (folder) {
                 if (!folder.activeInd) {
                     render(template: 'deletedFolder', plugin: "folderManagement")
@@ -979,7 +980,7 @@ class FmFolderController {
                 subFolderTypes.each {
                     subFolders = fmFolderService.getChildrenFolderByType(folder.id, it)
                     if (subFolders != null && subFolders.size() > 0) {
-                        log.debug "found ${subFolders.size()} subFolders == $subFolders"
+                        log.info "found ${subFolders.size()} subFolders == $subFolders"
                         def subFoldersAccessLevelMap = fmFolderService.getAccessLevelInfoForFolders(user, subFolders)
                         String gridTitle = "Associated " + StringUtils.capitalize(subFolders[0].pluralFolderTypeName.toLowerCase())
                         String gridData = createDataTable(subFoldersAccessLevelMap, gridTitle)
@@ -1355,7 +1356,7 @@ class FmFolderController {
         String mimeType = MIME_TYPES_FILES_MAP.getContentType fmFile.originalName
         log.debug "Downloading file $fmFile, mime type $mimeType"
 
-        //HttpServletResponse fileResponse=new HttpServletResponseWrapper(response)
+        HttpServletResponse fileResponse=new HttpServletResponseWrapper(response)
         response.setContentType mimeType
 
         /* This form of sending the filename seems to be compatible
@@ -1373,7 +1374,7 @@ class FmFolderController {
         if(!useMongo){
             def file = fmFolderService.getFile fmFile
             file.newInputStream().withStream {
-                response.outputStream << it
+                fileResponse.outputStream << it
             }
         }else{
             if(grailsApplication.config.transmartproject.mongoFiles.useDriver){
@@ -1382,7 +1383,7 @@ class FmFolderController {
                 DB db = mongo.getDB( grailsApplication.config.transmartproject.mongoFiles.dbName)
                 GridFS gfs = new GridFS(db)
                 GridFSDBFile gfsFile = gfs.findOne(fmFile.filestoreName)
-                response.outputStream << gfsFile.getInputStream()
+                fileResponse.outputStream << gfsFile.getInputStream()
                 mongo.close()
             }else {
                 def apiURL=grailsApplication.config.transmartproject.mongoFiles.apiURL
@@ -1392,7 +1393,7 @@ class FmFolderController {
                     headers.'apikey' = MongoUtils.hash(apiKey)
                     response.success = { resp, binary ->
                         assert resp.statusLine.statusCode == 200
-                        response.outputStream << binary
+                        fileResponse.outputStream << binary
                     }
                     response.failure = { resp ->
                         log.error("Problem during connection to API: "+resp.status)
